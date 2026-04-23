@@ -1,113 +1,79 @@
-import { useEffect, useState } from 'react'
-import {
-  API_BASE_URL,
-  ApiRequestError,
-  getApiHealth,
-  getApiRoot,
-  getDatabaseHealth,
-} from './api'
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import './App.css'
 
-function toUserFriendlyApiError(error: unknown): string {
-  if (error instanceof ApiRequestError) {
-    if (error.kind === 'config') {
-      return 'Set VITE_API_BASE_URL in Vercel to your Render backend URL, then redeploy.'
-    }
+const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim())
 
-    if (error.kind === 'timeout') {
-      return 'Backend timed out. Check if your server is running and reachable.'
-    }
+function HomePage() {
+  const navigate = useNavigate()
 
-    if (error.kind === 'network') {
-      return 'Network/CORS issue: backend may be down, wrong API URL, or blocked by CORS.'
-    }
+  return (
+    <main className="auth-screen">
+      <section className="auth-card">
+        <h1>InterviewCoach</h1>
+        <p className="auth-subtitle">Choose an option to continue</p>
+        <div className="auth-actions">
+          <button className="auth-btn" onClick={() => navigate('/login')}>
+            Login
+          </button>
+          <button className="auth-btn" onClick={() => navigate('/signup')}>
+            Signup
+          </button>
+        </div>
+      </section>
+    </main>
+  )
+}
 
-    return `Backend returned HTTP ${error.status ?? 'error'}.`
+type AuthMode = 'login' | 'signup'
+
+function AuthPage({ mode }: { mode: AuthMode }) {
+  const navigate = useNavigate()
+
+  const onGoogleSuccess = (response: CredentialResponse) => {
+    // Next step: send response.credential to backend for verification/session creation.
+    console.log(`${mode} success`, response)
   }
 
-  if (error instanceof Error) {
-    return error.message
-  }
+  return (
+    <main className="auth-screen">
+      <section className="auth-card">
+        <h1>{mode === 'login' ? 'Login' : 'Signup'}</h1>
+        <p className="auth-subtitle">Continue with Google</p>
 
-  return 'Unexpected error while checking backend.'
+        <div className="google-wrap">
+          {hasGoogleClientId ? (
+            <GoogleLogin
+              onSuccess={onGoogleSuccess}
+              onError={() => console.error(`Google ${mode} failed`)}
+              text={mode === 'login' ? 'signin_with' : 'signup_with'}
+              width="280"
+            />
+          ) : (
+            <p className="auth-warning">
+              Missing VITE_GOOGLE_CLIENT_ID. Add it in your environment variables.
+            </p>
+          )}
+        </div>
+
+        <button className="auth-link" onClick={() => navigate('/')}>
+          Back to Home
+        </button>
+      </section>
+    </main>
+  )
 }
 
 function App() {
-  const [apiMessage, setApiMessage] = useState('Checking backend...')
-  const [apiStatus, setApiStatus] = useState<'checking' | 'ok' | 'error'>(
-    'checking',
-  )
-  const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>(
-    'checking',
-  )
-  const [dbDetail, setDbDetail] = useState('Checking database...')
-
-  const checkBackendConnection = async () => {
-    setApiStatus('checking')
-    setDbStatus('checking')
-    setApiMessage('Checking backend...')
-    setDbDetail('Checking database...')
-
-    try {
-      const [root, health, dbHealth] = await Promise.all([
-        getApiRoot(),
-        getApiHealth(),
-        getDatabaseHealth(),
-      ])
-
-      if (health.status === 'ok') {
-        setApiStatus('ok')
-        setApiMessage(root.message)
-      } else {
-        setApiStatus('error')
-        setApiMessage('Backend responded, but health check failed.')
-      }
-
-      if (dbHealth.status === 'ok') {
-        setDbStatus('ok')
-        setDbDetail('Supabase/Postgres connection is healthy.')
-      } else {
-        setDbStatus('error')
-        setDbDetail(dbHealth.detail || 'Database health check failed.')
-      }
-    } catch (error) {
-      setApiStatus('error')
-      setDbStatus('error')
-      setApiMessage(toUserFriendlyApiError(error))
-      setDbDetail('DB check skipped because API check failed.')
-    }
-  }
-
-  useEffect(() => {
-    void checkBackendConnection()
-  }, [])
-
   return (
-    <>
-      <div className="backend-status">
-        <h2>Backend Connection</h2>
-        <p>
-          API URL: <code>{API_BASE_URL || 'Not configured'}</code>
-        </p>
-        <p>
-          API Status:{' '}
-          <span className={`status-pill ${apiStatus}`}>
-            {apiStatus.toUpperCase()}
-          </span>
-        </p>
-        <p>{apiMessage}</p>
-        <p>
-          DB Status:{' '}
-          <span className={`status-pill ${dbStatus}`}>
-            {dbStatus.toUpperCase()}
-          </span>
-        </p>
-        <p>{dbDetail}</p>
-        <button className="counter" onClick={() => void checkBackendConnection()}>
-          Recheck Backend
-        </button>
-      </div>
-    </>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/signup" element={<AuthPage mode="signup" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
