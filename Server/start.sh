@@ -13,11 +13,9 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-# Install dependencies only if FastAPI is not present yet.
-if ! python -c "import fastapi" >/dev/null 2>&1; then
-  echo "Installing dependencies from requirements.txt..."
-  python -m pip install -r requirements.txt
-fi
+# Keep environment in sync with requirements (handles newly added packages).
+echo "Syncing dependencies from requirements.txt..."
+python -m pip install -r requirements.txt
 
 echo "Starting FastAPI on http://127.0.0.1:8000"
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
