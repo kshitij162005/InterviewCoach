@@ -3,8 +3,8 @@ const isLocalBrowser =
   typeof window !== "undefined" &&
   ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
-const API_BASE_URL = (configuredApiBaseUrl ||
-  (isLocalBrowser ? "http://127.0.0.1:8000" : window.location.origin)
+const API_BASE_URL = (
+  configuredApiBaseUrl || (isLocalBrowser ? "http://127.0.0.1:8000" : "")
 ).replace(/\/$/, "");
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -18,7 +18,7 @@ type RootResponse = {
   message: string;
 };
 
-type RequestErrorKind = "timeout" | "network" | "http";
+type RequestErrorKind = "timeout" | "network" | "http" | "config";
 
 class ApiRequestError extends Error {
   kind: RequestErrorKind;
@@ -48,6 +48,14 @@ async function parseJsonResponse<T>(response: Response, url: string): Promise<T>
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new ApiRequestError(
+      "config",
+      "Missing VITE_API_BASE_URL in deployed environment.",
+      path,
+    );
+  }
+
   const url = `${API_BASE_URL}${path}`;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
